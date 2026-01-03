@@ -260,7 +260,7 @@ onPlayerChangeBlock = (playerId, x, y, z, fromBlock, toBlock) => {
 
     if (log.length === 0) {
       api.sendMessage(playerId, [
-        { str: "このブロックには履歴がありません\n", style: { color: "#999999" } }
+        { str: "This block has no history\n", style: { color: "#999999" } }
       ]);
       return "preventChange";
     }
@@ -379,7 +379,7 @@ playerCommand = (playerId, command) => {
   const dbId = api.getPlayerDbId(playerId);
   const isAllow = config.ALLOW_LIST.includes(dbId);
   if(!isAllow){
-    api.sendMessage(playerId, "許可リストに含まれていないためコマンドは使用できません")
+    api.sendMessage(playerId, "The command cannot be used because it is not included in the permission list")
   }
   if(cmd === "bml" && (parts[1] === "inspect" || parts[1] === "i") && isAllow){
     if(inspector.has(playerId)){
