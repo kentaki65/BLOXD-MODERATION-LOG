@@ -13,16 +13,18 @@ deter abusive or malicious behavior.
 ----
 
 
-## Contact / Support
+## 📱Contact / Support
 - If you have any questions or need help, please contact me on Discord:  
   **Discord:** `initial_ki`
 
-## Main Features
+## 🔩Main Features
 - Recording player activity logs
 - Tracking block operation history
 - Inspector mode (instant investigation)
 
-
+## 📦️Installation
+Copy and paste the [main code](https://github.com/kentaki65/BLOXD-MODERATION-LOG/blob/main/src/maincode_minified.js) into the world code.
+> Want to modify it? [Here's](https://github.com/kentaki65/BLOXD-MODERATION-LOG/blob/main/src/maincode_original.js) the original source code.
 ## CONFIG
 ```js
 const config = {
