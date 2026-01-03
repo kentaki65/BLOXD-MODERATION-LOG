@@ -1,3 +1,5 @@
+//MIT License
+//Copyright (c) 2026 kentaki65
 //This project includes modified code from "bim"
 //Licensed under AGPL-3.0
 //Original source: rentry.co/2kcfyvmv
