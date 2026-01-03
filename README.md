@@ -1,17 +1,27 @@
-# 明日翻訳します!
 ----
 <h1 align="center">🛡️ BloxdModerationLog</h1>
-<h3 align="center";"><em>「何が・誰によって・いつ起きたか」を後から辿れる、Bloxd サーバー運営向けの監査ログシステム</em></h3>
-<p align="center">Bloxdサーバー向けのプレイヤー行動・ブロック操作を記録／監査する管理用ログツールです。サーバーログとブロック履歴を永続保存し、不正行為の調査・抑止を目的としています。</p>
+<h3 align="center"><em>
+This is an audit logging system for Bloxd server administrators<br>
+which lets you trace what happened, who did it and when.
+</em></h3>
+<p align="center">
+A moderation and auditing tool for Bloxd servers that records and persists
+player actions and block operations. It is designed to help investigate and
+deter abusive or malicious behavior.
+</p>
 
 ----
 
-## 連絡先 / サポート
-- 質問・相談がある場合は Discord で連絡してください： **Discord:** `initial_ki`
-## 主な機能
-- プレイヤー行動ログの記録
-- ロック操作の履歴追跡
-- インスペクター（即時調査）機能
+
+## Contact / Support
+- If you have any questions or need help, please contact me on Discord:  
+  **Discord:** `initial_ki`
+
+## Main Features
+- Recording player activity logs
+- Tracking block operation history
+- Inspector mode (instant investigation)
+
 
 ## CONFIG
 ```js
@@ -29,123 +39,136 @@ const config = {
   ALLOW_LIST: ["5hFYzhrL29VWQHxYvaAHe"]
 };
 ```
-| 名前  | 説明 | 推奨値 |
+| Name | Description | Recommended |
 | ------------- | ------------- | ------------- |
-| SERVER_LOGS_PER_MESSAGE | 1つのメッセージで送信されるサーバーログの数 | 2 ~ 5 |
-| BLOCK_LOGS_PER_MESSAGE  | 1つのメッセージで送信されるブロックログの数 | 2 ~ 4 |
-| PREVENT_CHANGE_BY_EXPLOSIVE  | 真なら爆発物によるワールド変更をデフォルトで防ぎます | true |
-| SAVE_CHANGE_BY_WORLD  | ワールドによるブロック変更を保存するか | true |
-| SAVE_DATA_CHANGED_BY_WORLD  | ワールドによるブロック変更をブロックデータに保存するか | false |
-| SAVE_DATA_CHANGED_BY_PLAYER  | プレイヤーによるブロック変更をブロックデータに保存するか | true |
-| MAX_BLOCK_HISTORY  | ブロックに一時的に保存される履歴ログの最大数（超過分は自動的に破棄されます） | 4 ~ 8 |
-| INSPECT_SHOW_NEWEST_FIRST  | ブロックを検査したときに、最新の履歴を先頭に表示するかを指定します。 | true |
-| ENABLE_LOGGING  | ログの保存機能を有効／無効にします。 | true |
-| SEARCH_TIMEOUT  | ログ検索処理の最大実行時間（タイムアウト）[^1]を制御する設定です。ミリ秒で指定してください | 1000 |
-| ALLOW_LIST  | コマンドを使用できるプレイヤーを**DBID**で指定します。 | [any] |
+| SERVER_LOGS_PER_MESSAGE | Number of server log entries sent in a single message | 2 ~ 5 |
+| BLOCK_LOGS_PER_MESSAGE | Number of block log entries sent in a single message | 2 ~ 4 |
+| PREVENT_CHANGE_BY_EXPLOSIVE | If true, prevents world changes caused by explosives by default | true |
+| SAVE_CHANGE_BY_WORLD | Whether to record block changes caused by the world | true |
+| SAVE_DATA_CHANGED_BY_WORLD | Whether to store world-caused block changes in block data | false |
+| SAVE_DATA_CHANGED_BY_PLAYER | Whether to store player-caused block changes in block data | true |
+| MAX_BLOCK_HISTORY | Maximum number of history entries temporarily stored in a block (older entries are automatically discarded) | 4 ~ 8 |
+| INSPECT_SHOW_NEWEST_FIRST | Whether to display the newest history entry first when inspecting a block | true |
+| ENABLE_LOGGING | Enables or disables log recording | true |
+| SEARCH_TIMEOUT | Maximum execution time (timeout) for log search processing. Specify in milliseconds | 1000 |
+| ALLOW_LIST | List of **DBIDs** allowed to use the commands | [any] |
+
 
 [^1]:指定時間を超えると、検索途中でも処理を中断します<br>その場合、**見つかった分までのログのみが表示されます**<br>検索結果が少ない／途中で止まる場合は、値を増やしてください
 
 > [!WARNING]
-> 値を大きくしすぎるとサーバー負荷やレスポンス低下などにつながります
+> Setting values too high may cause increased server load and slower response times.
 
 ----
-## ⚙️ コマンド
-### 🔍`/bml inspect`
-- 実行で検査モード ON / OFF 切り替え
+## ⚙️ Commands
+### 🔍 `/bml inspect`
+- Toggles Inspector Mode ON / OFF
 
-| 設定可能な引数  | 説明 | 推奨値 |
+| Argument | Description | Recommended |
 | ------------- | ------------- | ------------- |
-| なし  | なし  | なし |
+| None | None | None |
 
 ---
-### 📝`/bml log <page> <player> <type> <time> <keyWord>`
-- ストレージから条件を満たしたサーバーログを出力します。
-- 引数は省略可能です。
+### 📝 `/bml log <page> <player> <type> <time> <keyword>`
+- Outputs server logs from storage that match the specified conditions.
+- All arguments are optional.
 
-| 設定可能な引数  | 説明 | 例 |
+| Argument | Description | Example |
 | ------------- | ------------- | ------------- |
-| \<page>  | 表示するページ番号。（省略すると最初のページ） | 1 |
-| \<player>  | プレイヤー名または DBID を指定。`*`で全員 | kentaki_js |
-| \<type>  | ログ種別。 `join`/`chat` または `*`（全て） | chat |
-| \<time>  | 日時フィルター。 `after:YYYY-MM-DD`/`before:YYYY-MM-DD` | after:2026-01-01 |
-| \<keyword>  | メッセージ内のキーワードで絞り込み | hello |
+| `<page>` | Page number to display (defaults to the first page if omitted) | 1 |
+| `<player>` | Player name or DBID. Use `*` for all players | kentaki_js |
+| `<type>` | Log type: `join` / `chat` or `*` (all) | chat |
+| `<time>` | Time filter: `after:YYYY-MM-DD` / `before:YYYY-MM-DD` | after:2026-01-01 |
+| `<keyword>` | Filter by keyword contained in the message | hello |
 
-### ❓️ 例:
+### ❓ Examples:
 #### `/bml log * * join`
-- この例ではプレイヤーの入室記録を出力します
+- Outputs player join records.
 
-#### `/bml log * * * * こんにちは`
-- この例では"こんにちは"を含む発言をしたチャット履歴を出力します。
+#### `/bml log * * * * hello`
+- Outputs chat logs containing the message "hello".
 
 #### `/bml log * kentaki_js chat after:2025-12-31 *`
-- この例ではプレイヤーkentaki_jsの2025-12-31からのチャット履歴を出力します。
+- Outputs chat logs from player `kentaki_js` starting from 2025-12-31.
 
 ---
-### 🧱`/bml block <page> <player> <type> <time> <keyword>`
-- ストレージから条件を満たしたブロック変更履歴を出力します。
-- 引数は省略可能です。
+### 🧱 `/bml block <page> <player> <type> <time> <keyword>`
+- Outputs block change logs from storage that match the specified conditions.
+- All arguments are optional.
 
-| 設定可能な引数  | 説明 | 例 |
+| Argument | Description | Example |
 | ------------- | ------------- | ------------- |
-| \<page>  | 表示するページ番号。（省略すると最初のページ） | 1 |
-| \<player>  | プレイヤー名または DBID を指定。[^2]`*`で全員 | kentaki_js |
-| \<type>  | アクション種別。 `place`/`break`/`update` または `*`（全て） | place |
-| \<time>  | 日時フィルター。 `after:YYYY-MM-DD`/`before:YYYY-MM-DD`または`*`(指定なし) | after:2026-01-01 |
-| \<keyword>  | ブロック名で絞り込み。ダブルコーテーションで囲ってください。[^3]`*`で指定なし | "Grass Block" |
-[^2]: 完全一致
-[^3]: 部分一致でも可
-### アクション種別一覧
-| 指定値 | 内容 |
+| `<page>` | Page number to display (defaults to the first page if omitted) | 1 |
+| `<player>` | Specify a player name or DBID.[^2] Use `*` for all players | kentaki_js |
+| `<type>` | Action type: `place` / `break` / `update` or `*` (all) | place |
+| `<time>` | Time filter: `after:YYYY-MM-DD` / `before:YYYY-MM-DD` or `*` (no filter) | after:2026-01-01 |
+| `<keyword>` | Filter by block name. Must be wrapped in double quotes.[^3] Use `*` for no filter | "Grass Block" |
+
+[^2]: Exact match  
+[^3]: Partial matches are also supported
+
+### Action Type List
+| Value | Description |
 |------|------|
-| place | ブロック設置 |
-| break | ブロック破壊 |
-| update | ブロック更新（Code Block など） |
-| * | すべて |
+| place | Block placement |
+| break | Block destruction |
+| update | Block update (e.g. Code Blocks) |
+| * | All actions |
 
-### ❓️ 例:
+### ❓ Examples:
 #### `/bml block * * * * "Chest"`
-- チェストを設置または破壊したプレイヤーを探し、ブロック変更履歴を出力します。
+- Finds players who placed or broke a chest and outputs the corresponding block change logs.
 
-####  `/bml block 1 * break * *`
-- ブロックを破壊したプレイヤーを探し、ブロック変更履歴を出力します。
+#### `/bml block 1 * break * *`
+- Outputs block change logs for players who broke blocks.
 
 #### `/bml block * * update * "Code"`
-- コードブロックを更新したプレイヤーを探し、ブロック変更履歴を出力します。
+- Finds players who updated Code Blocks and outputs the block change logs.
+
 > [!WARNING]
-> `ALLOW＿LIST`で許可されていないとコマンドは使用できません
+> This command can only be used by players allowed in `ALLOW_LIST`.
+
 ----
-## 🔍Inspectorモード
-Inspector モードは、ブロックやログを対話的に検査するためのモードです。
-通常の検索コマンドとは異なり、最新の情報を中心に素早く状況を確認する用途を想定しています。
-### 主な用途
-- 荒らし行為の即時確認
-- 特定地点・ブロックの履歴チェック
-- ログ検索結果を目視しながら精査したい場合
+## 🔍 Inspector Mode
+Inspector Mode is an interactive mode for inspecting blocks and logs.
+Unlike regular search commands, it is designed for **quickly checking the most recent events** and understanding the current situation.
 
-### 🧪 特徴
-- 最新ログを優先表示<br>
-→ Inspector モードでは、直近のログが最初に表示されます。（INSPECT_SHOW_NEWEST_FIRST の設定に依存
-- 一時的ログを対象に高速検査<br>
-→ ブロックデータに保存されている「一時的な履歴」を使うため、ストレージ全体を走査する検索よりも高速です
-- リアルタイム確認向け<br>
-→ 長時間の履歴調査ではなく、「今何が起きたか」を見るためのモードです
+### Main Use Cases
+- Immediate confirmation of griefing or suspicious behavior
+- Checking the history of a specific location or block
+- Visually reviewing logs while investigating an incident
 
-### 🧩 使用方法
-まず、[このコマンド](https://github.com/kentaki65/BLOXD-MODERATION-LOG/edit/main/%E6%97%A5%E6%9C%AC%E4%BA%BA%E5%90%91%E3%81%91.md#bml-inspect)を実行して インスペクターモードを有効化します。
-その状態で 調査したいブロックを破壊してください。
-- ブロックは 実際には破壊されません
-- 代わりに、そのブロックに保存されている 変更履歴（ログ） がチャットに表示されます
+### 🧪 Features
+- **Prioritizes the latest logs**  
+  → In Inspector Mode, the most recent logs are displayed first  
+  (depends on the `INSPECT_SHOW_NEWEST_FIRST` setting)
+- **Fast inspection using temporary logs**  
+  → Uses *temporary history stored in block data*, making it much faster than searching the entire storage
+- **Designed for real-time checks**  
+  → Best suited for seeing *what just happened*, not for long-term history analysis
 
-### ⚠️ 注意事項
-- Inspector モードで表示される履歴は **ブロックに一時保存されているデータのみ** です
-- `MAX_BLOCK_HISTORY` 超過により、古い履歴は失われることに注意してください。
-- 過去すべての履歴を確認したい場合は [`/bml block`](https://github.com/kentaki65/BLOXD-MODERATION-LOG/edit/main/%E6%97%A5%E6%9C%AC%E4%BA%BA%E5%90%91%E3%81%91.md#bml-block-page-player-type-time-keyword) コマンドを使用してください
+### 🧩 How to Use
+First, enable Inspector Mode using  
+[this command](https://github.com/kentaki65/BLOXD-MODERATION-LOG/edit/main/%E6%97%A5%E6%9C%AC%E4%BA%BA%E5%90%91%E3%81%91.md#bml-inspect).
 
-## クレジット
-- Oceloteが開発したbimを改変し使用しています。オリジナルソース: (https://rentry.co/2kcfyvmv)
-- NlGBOBが開発したスケジューラを使用しています。github: (https://github.com/NlGBOB/bloxd-scheduler)
-- 非常に強力なツールを作成していただきありがとうございます！
+Then, simply **break the block you want to inspect**.
+- The block is **not actually destroyed**
+- Instead, the **change history (logs) stored in that block** will be displayed in chat
+
+### ⚠️ Notes
+- Logs shown in Inspector Mode are **only the temporary history stored in the block**
+- Older logs may be lost once `MAX_BLOCK_HISTORY` is exceeded
+- To search **all past logs**, use the  
+  [`/bml block`](https://github.com/kentaki65/BLOXD-MODERATION-LOG/edit/main/%E6%97%A5%E6%9C%AC%E4%BA%BA%E5%90%91%E3%81%91.md#bml-block-page-player-type-time-keyword) command instead
+
+## Credits
+- Modified and used **bim** originally developed by **Ocelote**  
+  Original source: https://rentry.co/2kcfyvmv
+- Uses the scheduler developed by **NlGBOB**  
+  GitHub: https://github.com/NlGBOB/bloxd-scheduler
+- Thank you for creating such powerful tools!
 
 > [!TIP]
-> **今起きている荒らしを確認したい** → Inspector モード<br>
-> **過去の履歴を条件検索したい** → `/bml log` / `/bml block`
+> **Want to check ongoing griefing right now?** → Inspector Mode  
+> **Want to search past logs with conditions?** → `/bml log` / `/bml block`
+
