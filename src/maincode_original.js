@@ -1,9 +1,9 @@
-//MIT License
-//Copyright (c) 2026 kentaki65
-//This project includes modified code from "bim"
-//Licensed under AGPL-3.0
-//Original source: rentry.co/2kcfyvmv
-//This version has been modified for use in BloxdModerationLog.
+/* MIT License
+Copyright (c) 2026 kentaki65
+This project includes modified code from "bim"
+Licensed under AGPL-3.0
+Original source: rentry.co/2kcfyvmv
+*/
 
 const config = {
   SERVER_LOGS_PER_MESSAGE: 5,
