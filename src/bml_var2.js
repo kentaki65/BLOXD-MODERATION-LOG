@@ -1,6 +1,6 @@
 /* MIT License Copyright (c) 2026 kentaki65 Includes modified code from "bim" (AGPL-3.0) */
 const startUpTime = api.now();
-const config = {
+const config = Object.freeze({
   SERVER_LOGS_PER_MESSAGE: 5,
   BLOCK_LOGS_PER_MESSAGE: 3,
   PREVENT_CHANGE_BY_EXPLOSIVE: true,
@@ -46,7 +46,7 @@ const config = {
   EXPORT_PLACEMENT_INTERVAL_TICKS: 1,
   CHEST_OP_COOLDOWN_TICKS: 2,
   INDEX_PROCESS_INTERVAL: 10,
-};
+});
 
 // ── Scheduler ──
 S = {
@@ -1582,21 +1582,30 @@ playerCommand = (playerId, command) => {
     const text = [
       { str: "=== BML Help ===\n\n" },
       { str: "/bml inspect\n", style: { fontStyle: "italic" } },
-      { str: "・インスペクターモードを切り替えます\n" },
-      { str: `/bml log [page(0〜${playerLastPage})] [player] [type] [time] [keyword]\n`, style: { fontStyle: "italic" } },
-      { str: "・参加・退出・チャット履歴を検索します\n" },
-      { str: `/bml block [page(0〜${blockLastPage})] [player] [type] [time] [keyword]\n`, style: { fontStyle: "italic" } },
-      { str: "・設置・破壊・更新履歴を検索します\n" },
-      { str: "/bml export <block|player> <演算子>\n", style: { fontStyle: "italic" } },
-      { str: "・自分の足元にCode BlockとしてCSV出力します\n" },
-      { str: "/bml purge <block|player> <演算子> [confirm]\n", style: { fontStyle: "italic" } },
-      { str: "・ログを永続データから削除します(confirmなしは件数確認のみ)\n" },
+      { str: "- Toggles inspector mode\n" },
+
+      { str: `/bml log [page(0-${playerLastPage})] [player] [type] [time] [keyword]\n`, style: { fontStyle: "italic" } },
+      { str: "- Searches join, leave, and chat history\n" },
+
+      { str: `/bml block [page(0-${blockLastPage})] [player] [type] [time] [keyword]\n`, style: { fontStyle: "italic" } },
+      { str: "- Searches block placement, break, and update history\n" },
+
+      { str: "/bml export <block|player> <operator>\n", style: { fontStyle: "italic" } },
+      { str: "- Exports results as CSV in a Code Block at your feet\n" },
+
+      { str: "/bml purge <block|player> <operator> [confirm]\n", style: { fontStyle: "italic" } },
+      { str: "- Deletes logs from persistent storage (without confirm, only the count is shown)\n" },
+
       { str: "/bml rollback [time] [radius] [player] [confirm]\n", style: { fontStyle: "italic" } },
-      { str: "・自分の周囲のブロック変更を元に戻します(confirmなしは件数確認のみ)\n" },
-      { str: "\n演算子: * / after:YYYY-MM-DD / before:YYYY-MM-DD / Ns,Nm,Nh(相対時間)\n" },
-      { str: "block検索の除外例: /bml block * * * * * -Stone -Dirt\n" },
+      { str: "- Reverts nearby block changes around you (without confirm, only the count is shown)\n" },
+
+      { str: "\nOperators: * / after:YYYY-MM-DD / before:YYYY-MM-DD / Ns,Nm,Nh (relative time)\n" },
+
+      { str: "Exclude example for block search: /bml block * * * * * -Stone -Dirt\n" },
+
       { str: "\nlog: join / chat / *\nblock: place / break / update / *\ntime: after:YYYY-MM-DD / before:YYYY-MM-DD" },
-      { str: "\n※ページ範囲はフィルタなし検索時の目安です(user/action/keyword指定時は実際より少なくなります)\n" }
+
+      { str: "\n\n* Page ranges are only a guideline for unfiltered searches. When filtering by user, action, or keyword, the actual number of pages may be smaller.\n" }
     ];
     api.sendMessage(playerId, text);
     return true;
