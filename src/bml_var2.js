@@ -3,14 +3,14 @@ const startUpTime = api.now();
 const config = Object.freeze({
   SERVER_LOGS_PER_MESSAGE: 5,
   BLOCK_LOGS_PER_MESSAGE: 3,
-  PREVENT_CHANGE_BY_EXPLOSIVE: true,
-  SAVE_CHANGE_BY_WORLD: false,
+  PREVENT_CHANGE_BY_EXPLOSIVE: false,
+  SAVE_CHANGE_BY_WORLD: true,
   MAX_BLOCK_HISTORY: 5,
   INSPECT_SHOW_NEWEST_FIRST: true,
   MESSAGE_NEWEST_FIRST: true,
   ENABLE_LOGGING: true,
   ENABLE_LOGGER: true,
-  SEARCH_TIMEOUT: 1000,
+  SEARCH_TIMEOUT: 100000,
   ALLOW_LIST: ["5hFYzhrL29VWQHxYvaAHe"],
   BLACK_LIST: [],
   BIM_SLOTS: 8,
@@ -30,9 +30,13 @@ const config = Object.freeze({
   MIN_ITEMS_PER_TICK: 15,
   STUCK_ITEM_RETRY_LIMIT: 10,
   WRITE_RETRY_DELAY_TICKS: 10,
-  ESTIMATED_MS_PER_CHUNK: 20,
+  ESTIMATED_MS_PER_CHUNK: 150,
   SEARCH_COMMAND_COOLDOWN: 1500,
   FLUSH_DEBOUNCE_TICKS: 5,
+  FLUSH_MIN_FILL_RATIO: 0.7,
+  FLUSH_MAX_WAIT_TICKS: 200,
+  RATE_LIMIT_CHARS_PER_MIN: 40000,
+  WRITE_BUDGET_BURST_CHARS: 2000,
   FAILSAFE_COOLDOWN_TICKS: 100,
   QUEUE_MAX_LENGTH: 1500,
   SCAN_LIMIT_CAP: 50,
@@ -282,20 +286,18 @@ function makeRawStore(base) {
   const setSlot = (pos, slotIdx, name, amount, data, attrs) => {
     api.setStandardChestItemSlot(pos, slotIdx, name, amount, data, attrs);
     const k = String(pos);
-    const arr = chest.get(k) || [];
-    arr[slotIdx] = { name, amount, attributes: attrs };
-    chest.set(k, arr);
+    const m = chest.get(k) || new Map();
+    m.set(slotIdx, { name, amount, attributes: attrs });
+    chest.set(k, m);
   };
   const getSlot = (pos, slotIdx) => {
     const k = String(pos);
-    const arr = chest.get(k);
-    if (arr) return arr[slotIdx];
+    const m = chest.get(k);
+    if (m && m.has(slotIdx)) return m.get(slotIdx);
     const single = api.getStandardChestItemSlot(pos, slotIdx);
-    if (single) {
-      const arr2 = chest.get(k) || [];
-      arr2[slotIdx] = single;
-      chest.set(k, arr2);
-    }
+    const m2 = chest.get(k) || new Map();
+    m2.set(slotIdx, single);
+    chest.set(k, m2);
     return single;
   };
   const decodeIndex = idx => {
@@ -426,13 +428,29 @@ class ChunkedLogStore {
 
   lastPage(limit) { return Math.max(0, Math.ceil(this.totalEntries / limit) - 1); }
 
-  scheduleFlush() {
+scheduleFlush() {
     if (this.flushScheduled) return;
     this.flushScheduled = true;
     S.run(() => {
       this.flushScheduled = false;
-      this.flush();
+      this._maybeFlush();
     }, config.FLUSH_DEBOUNCE_TICKS, `${this.logLabel}FlushDebounce`);
+  }
+
+  // チャンクがある程度埋まる(FLUSH_MIN_FILL_RATIO)か、
+  // 滞留が長引く(FLUSH_MAX_WAIT_TICKS)まで実書き込みを遅らせる。
+  // 同じチャンクを毎回まるごと再送する構造上、細切れにflushするほど
+  // 総送信文字数が膨らむため、これが増幅そのものへの対策になる。
+  _maybeFlush() {
+    if (!this.Queue.length) return;
+    const pendingChars = this.Queue.reduce((s, e) => s + e.length, 0);
+    const enoughFill = pendingChars >= config.MAX_DESC * config.FLUSH_MIN_FILL_RATIO;
+    const tooOld = S.c - this.firstPendingTick >= config.FLUSH_MAX_WAIT_TICKS;
+    if (!enoughFill && !tooOld) {
+      this.scheduleFlush();
+      return;
+    }
+    this.flush();
   }
 
   _pushEntry(encoded, indexMeta) {
@@ -440,6 +458,7 @@ class ChunkedLogStore {
       api.log(`[${this.logLabel}] entry too large (${encoded.length}), dropping`);
       return;
     }
+    if (!this.Queue.length) this.firstPendingTick = S.c;
     this.Queue.push(encoded);
     this.indexBuffer.push(indexMeta);
     this.totalEntries++;
@@ -551,6 +570,7 @@ class ChunkedLogStore {
           cb([]);
           return;
         }
+        if (retries === 0) api.log(`[${this.logLabel}] getChunk key=${key} miss, retrying...`);
         S.run(() => this.getChunk(key, cb, retries + 1), 20);
         return;
       }
@@ -665,7 +685,7 @@ class IndexStore {
   addEvent(e) {
     if (!this.ready) return;
     if (this.Queue.length >= this.ABSOLUTE_MAX_QUEUE) {
-      api.log(`[IndexDaemon/WARN] Queue absolute limit reached; dropping event`);
+      //api.log(`[IndexDaemon/WARN] Queue absolute limit reached; dropping event`);
       return;
     }
     this.Queue.push(e);
@@ -889,6 +909,33 @@ const ChestRateLimiter = {
   },
 };
 
+// 追加: ChestRateLimiter の直前あたりに新設
+const GlobalWriteBudget = {
+  // setBlockData / setStandardChestItemSlot 両方を合算した文字数で管理する
+  // (BimManagerのstore単位ではなく、プラグイン全体でひとつのバケット)
+  chesPerTick: config.RATE_LIMIT_CHARS_PER_MIN / 60 / 20, // 40000/60/20 = 33.33...
+  remaining: config.WRITE_BUDGET_BURST_CHARS,
+  lastRefillTick: 0,
+
+  refill(tick) {
+    const elapsed = tick - this.lastRefillTick;
+    if (elapsed <= 0) return;
+    this.remaining = Math.min(
+      config.WRITE_BUDGET_BURST_CHARS,
+      this.remaining + elapsed * this.chesPerTick
+    );
+    this.lastRefillTick = tick;
+  },
+
+  // 予算があれば消費してtrue、無ければfalse(呼び出し側は待って再試行する)
+  tryConsume(chars) {
+    this.refill(S.c);
+    if (chars > this.remaining) return false;
+    this.remaining -= chars;
+    return true;
+  },
+};
+
 function processQueueItems(st, q, maxOps) {
   let chestOps = 0;
   while (q.size > 0 && chestOps < maxOps) {
@@ -911,6 +958,7 @@ function processQueueItems(st, q, maxOps) {
         cb?.(key, undefined);
         continue;
       }
+      api.log(`[BIM:${st.name}] chunk not loaded at ${pos} (try ${c[4]})`);
       break; // ロード待ち、次 tick に委譲
     }
 
@@ -920,6 +968,11 @@ function processQueueItems(st, q, maxOps) {
         api.log(`[BIM:${st.name}] Descriptor exceeds MAX_DESC (${data.length}); truncating`);
         data = data.slice(0, config.MAX_DESC);
       }
+
+      if (!GlobalWriteBudget.tryConsume(data.length)) {
+        break; // 文字数予算が足りない。qは触らず次tickに持ち越す
+      }
+
       let ok = true;
       try {
         const posKey = `${pos[0]},${pos[1]},${pos[2]}`;
@@ -1012,10 +1065,14 @@ const LogSearchService = {
     const chunkCount = candidates ? candidates.length : playerLog.count;
     sendSearchingMessage(playerId, chunkCount);
     let matchedCount = 0;
+    let timedOut = false;
     const view = [];
 
     const sendResult = () => {
       let buffer = [{ str: `=== Player Log ${isAll ? "(first " + limit + ")" : `(page ${page})`} ===\n`, style: { color: "#aaaaaa", fontStyle: "italic" } }];
+      if (timedOut) {
+        buffer.push({ str: `[WARN] Search timed out before scanning all chunks; results may be incomplete\n`, style: { color: "#FFAA00", fontStyle: "italic" } });
+      }
       view.sort((a, b) => config.MESSAGE_NEWEST_FIRST ? b.epoch - a.epoch : a.epoch - b.epoch);
       if (!view.length) {
         buffer.push({ str: "No logs matched your query.\n", style: { color: "#888888", fontStyle: "italic" } });
@@ -1048,7 +1105,8 @@ const LogSearchService = {
       const keys = candidates.sort((a, b) => b - a);
       let idx = 0;
       const step = () => {
-        if (idx >= keys.length || isTimeout()) return sendResult();
+        if (idx >= keys.length) return sendResult();
+        if (isTimeout()) { timedOut = true; return sendResult(); }
         playerLog.getChunk(keys[idx], entries => {
           const arr = entries || [];
           for (let k = arr.length - 1; k >= 0; k--) {
@@ -1067,8 +1125,8 @@ const LogSearchService = {
 
     let i = playerLog.count;
     const getNext = () => {
-      if (i < 1 || isTimeout()) return sendResult();
-      playerLog.getChunk(i, entries => {
+      if (i < 1) return sendResult();
+      if (isTimeout()) { timedOut = true; return sendResult(); }      playerLog.getChunk(i, entries => {
         for (let k = entries.length - 1; k >= 0; k--) {
           const d = entries[k];
           if (!matchesFilters(d)) continue;
@@ -1210,6 +1268,10 @@ const ExportService = {
     let truncated = false, aborted = false;
 
     const placeAndAdvance = (text, cb) => {
+      if (!GlobalWriteBudget.tryConsume(text.length)) {
+        S.run(() => placeAndAdvance(text, cb), 1); // 予算が貯まるまで1tickずつ再試行
+        return;
+      }
       const pos = [startPos[0], currentY, startPos[2]];
       withLoadedChunk(pos, () => {
         api.setBlock(pos, config.EXPORT_CODEBLOCK_NAME);
